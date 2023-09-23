@@ -10,7 +10,7 @@
 
 namespace LibMem {
 
-constexpr size_t SPACESIZE = 4096 * 4;
+constexpr size_t SPACESIZE = 4096 * 8;
 
 // Each of these is 24 bytes
 // if the cache line size is
@@ -168,6 +168,7 @@ public:
 			throw std::runtime_error("Out of memory");
 		} else if (memsize > this->m_total_available &&
 				   memsize < this->m_total_padding) {
+			throw std::runtime_error("Unimplemented");
 			// Try to defrag the memory and if
 			// that fails, throw what it threw again.
 			try {
@@ -181,7 +182,7 @@ public:
 
 		// If all checks pass, construct
 		// a MemBlock with the requirements
-		size_t total_used = SPACESIZE - this->m_total_available;
+		const size_t total_used = SPACESIZE - this->m_total_available;
 		T* block_begin =
 			static_cast<T*>(this->m_space) + total_used + memsize_padded;
 
@@ -197,10 +198,15 @@ public:
 		return block;
 	}
 
-	template <typename T>
-	[[nodiscard]] auto reallocte(MemBlock<T>& memblock) -> MemBlock<T>;
-
+	template <typename T> auto reallocate(MemBlock<T>& memblock) -> void;
 	template <typename T> auto freemem(MemBlock<T> block) -> void;
+
+	/**
+	 * @brief Resets the allocator, voiding all previous allocations.
+	 * @note Using any `MemBlock`s allocated before a reset is undefined
+	 * behaviour after reset is called.
+	 */
+	auto reset() -> void;
 	auto setmem() -> void;
 };
 } // namespace LibMem

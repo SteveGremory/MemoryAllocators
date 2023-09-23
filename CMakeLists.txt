@@ -67,4 +67,5 @@ add_executable(benchmarks ${BENCHMARKS_SOURCES})
 target_link_libraries(
     benchmarks PUBLIC
         benchmark::benchmark
+        libmem
 )

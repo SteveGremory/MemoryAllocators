@@ -25,7 +25,7 @@ int main() {
 	auto& x = *(intblock + 2);
 	x = 123;
 
-	std::cout << *(intblock + 2) << std::endl;
+	std::cout << sizeof(MemBlock<double>) << std::endl;
 
 	return 0;
 }
