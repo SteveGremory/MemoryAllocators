@@ -1,9 +1,11 @@
 # Allocators
 
-Different types of memory allocators i'm writing to understand them better.
+A decently fast, malloc based, linear allocator with some clever features (defragmentation). A pool allocator will also be added soon.
 
 # Benchmarks
-TBA
+
+To run the benchmarks compile the project and run the `benchmarks` executable.
 
 # Tests
-TBA
+
+To run the benchmarks compile the project and run the `tests` executable.
