@@ -4,12 +4,13 @@ project(NetworkStack)
 # Set C++ options
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_BUILD_TYPE Release)
+set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # GTest & GBench
 set(GTEST_GIT_TAG v1.13.0)
 set(GBENCH_GIT_TAG v1.8.3)
+set(BENCHMARK_ENABLE_TESTING OFF)
 include(FetchContent)
 FetchContent_Declare(
     googletest
@@ -27,16 +28,23 @@ message("-- Fetched GTest version: ${GTEST_GIT_TAG}")
 
 # libmem
 file(GLOB_RECURSE libmem_SOURCES
-        libmem/*.cpp
+        source/*.cpp
+        source/libmem/*.cpp
 )
+message(${libmem_SOURCES})
 add_library(libmem ${libmem_SOURCES})
 target_include_directories(libmem PUBLIC 
-        libmem/
+        source/
 )
+target_link_libraries(libmem PUBLIC asan)
 
 target_compile_options(libmem PRIVATE
         -Wall -fsanitize=address -Wextra
 )
+
+# An exec to quick-test with
+add_executable(Main bin/main.cpp)
+target_link_libraries(Main PUBLIC libmem)
 
 # Tests
 file(GLOB_RECURSE TESTS_SOURCES
