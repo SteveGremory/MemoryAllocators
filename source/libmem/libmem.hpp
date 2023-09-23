@@ -1,123 +1,58 @@
 #ifndef LIBMEM_HPP
 #define LIBMEM_HPP
 
+#include "memblock.hpp"
 #include "utils/utils.hpp"
 
 #include <concepts>
 #include <cstdlib>
 #include <iostream>
 #include <stdexcept>
+#include <vector>
 
 namespace LibMem {
 
-constexpr size_t SPACESIZE = 4096 * 8;
+constexpr size_t SPACESIZE = 8192;
 
-// Each of these is 24 bytes
-// if the cache line size is
-// 64 bytes, then at least 2
-// blocks should be pretty
-// fast to access
-template <typename T> struct MemBlock {
-
-	MemBlock(T* ptr, size_t size, size_t index, size_t padding)
-		: m_ptr(ptr), m_size(size), m_index(index), m_padding(padding) {}
-
-	~MemBlock() {}
+class FreedTable {
+public:
+	FreedTable();
+	~FreedTable() = default;
 
 	/**
-	 * @brief Returns a pointer to the *start* of the data in memory. The
-	 * pointer may change after a call to allocate/free.
-	 * @returns Pointer to the start of the data in memory.
+	 * @brief Add a free region to the table
+	 * @param start Address to the start of the region
+	 * @param size Size of the region in bytes
+	 * @returns void
 	 */
-	auto getptr() -> T* { return this->m_ptr; }
+	auto add_region(void* start, const size_t size) -> void;
 
 	/**
-	 * @brief Getter function to get the size of the MemBlock
-	 * @returns Size of the MemBlock in bytes
+	 * @brief Remove a free region from the table
+	 * @param start Address to the start of the region
+	 * @param size Size of the region in bytes
+	 * @note If the size passed in is less than
+	 * @returns nullptr upon failure and a pointer to the start of the region
+	 * upon success
 	 */
-	auto getsize() -> size_t { return this->m_size; }
-
-	// Iterator functions
-	auto begin() -> T* { return this->m_ptr; }
-	auto end() -> T* { return this->m_ptr + this->m_size; }
+	[[nodiscard]] auto remove_region(const int index, const size_t size)
+		-> void*;
 
 	/**
-	 * @brief If the underlying type supports array indexing, it will be
-	 * available via the MemBlock itself.
-	 *
-	 * @note Always prefer using integrated MemBlock functions and avoid using
-	 * pointers direclty whenever possible.
+	 * @brief Check if any available regions fit the current need
+	 * @param size Size of the block that to be allocated
+	 * @note Time complexity: O(n) where n is the number of elements
+	 * currently in the vector
+	 * @returns -1 if no regions are available or a the index of the
+	 * available region if one is found
 	 */
-	T& operator[](size_t index) {
-		static_assert(
-			requires { this->m_ptr[0]; },
-			"This type does NOT support the index operator");
+	[[nodiscard]] auto available(const size_t size) -> int;
 
-		if (index >= this->m_size) {
-			throw std::out_of_range("Access violation: index out of range.");
-		}
-
-		return this->m_ptr[index];
-	}
-
-	// Overload the ++ operator (prefix)
-	MemBlock<T>& operator++() {
-		if (this->m_ptr < this->m_ptr + this->m_size - 1) {
-			++this->m_ptr;
-		} else {
-			throw std::out_of_range("Pointer out of bounds");
-		}
-		return *this;
-	}
-
-	// Overload the ++ operator (postfix)
-	MemBlock<T> operator++(auto) {
-		MemBlock<T> temp(*this);
-		if (this->m_ptr < this->m_ptr + this->m_size - 1) {
-			++this->m_ptr;
-		} else {
-			throw std::out_of_range("Pointer out of bounds");
-		}
-		return temp;
-	}
-
-	// Overload the + operator
-	MemBlock<T> operator+(size_t offset) const {
-		if (this->m_ptr + offset < this->m_ptr + this->m_size) {
-			return MemBlock<T>(this->m_ptr + offset, this->m_size - offset,
-							   this->m_index, this->m_padding);
-		} else {
-			throw std::out_of_range("Pointer out of bounds");
-		}
-	}
-
-	// Overload the dereference operator
-	T& operator*() {
-		if (this->m_ptr >= this->m_ptr + this->m_size) {
-			throw std::out_of_range("Pointer out of bounds");
-		}
-		return *this->m_ptr;
-	}
-
-	// Overload the arrow operator
-	T* operator->() {
-		if (this->m_ptr >= this->m_ptr + this->m_size) {
-			throw std::out_of_range("Pointer out of bounds");
-		}
-		return this->m_ptr;
-	}
+	// Returns the internal vector
+	auto get_available_regions() -> std::vector<std::pair<void*, size_t>>;
 
 private:
-	T* m_ptr;
-
-	size_t m_size;
-	size_t m_index;
-	size_t m_padding;
-
-	// Allocator is a friend class
-	// so that it can access
-	// MemBlock's private members
-	friend class Allocator;
+	std::vector<std::pair<void*, size_t>> m_freed_regions;
 };
 
 // This class should ideally
@@ -133,13 +68,20 @@ private:
 	size_t m_total_padding;
 	size_t m_current_index;
 
+	FreedTable m_freed_table;
+
 	auto m_defragment() -> void;
 
 public:
 	Allocator();
 	~Allocator();
-	// Thought: are templated allocate/reallocate methods really that important?
-	// Should I add them?
+
+	/**
+	 * @brief Resets the allocator, voiding all previous allocations.
+	 * @note Using any `MemBlock`s allocated before a reset is undefined
+	 * behaviour after reset is called.
+	 */
+	auto reset() -> void;
 
 	/**
 	 * @brief Allocates memory and gives back the MemBlock object
@@ -147,7 +89,6 @@ public:
 	 * @param typesize The size of each element to be allocated
 	 * @returns MemBlock structure populated with details about the memory
 	 */
-
 	template <size_t AMT, typename T>
 	[[nodiscard]] auto allocate() -> MemBlock<T> {
 		constexpr size_t memsize = AMT;
@@ -156,19 +97,20 @@ public:
 
 		// if the amount being asked for is
 		// larger than what is possible, die
-		static_assert(!(memsize > SPACESIZE),
+		static_assert(!(memsize_padded > SPACESIZE),
 					  "Invalid Allocation: The requested size exceeds the "
 					  "maximum allowed size.");
 
 		// if the memory is available: allocate
 		// else: try and defragment
 		//       if defrag fails: throw OOM and die
-		if (memsize > this->m_total_available &&
-			memsize > this->m_total_padding) {
+
+		if (memsize_padded > this->m_total_available &&
+			memsize_padded > this->m_total_padding) {
+
 			throw std::runtime_error("Out of memory");
-		} else if (memsize > this->m_total_available &&
-				   memsize < this->m_total_padding) {
-			throw std::runtime_error("Unimplemented");
+		} else if (memsize_padded > this->m_total_available &&
+				   memsize_padded < this->m_total_padding) {
 			// Try to defrag the memory and if
 			// that fails, throw what it threw again.
 			try {
@@ -180,11 +122,25 @@ public:
 			}
 		}
 
-		// If all checks pass, construct
-		// a MemBlock with the requirements
+		// If the block wasn't initialised earlier, do it now
+		T* block_begin;
+		int fr_index = 0;
+
 		const size_t total_used = SPACESIZE - this->m_total_available;
-		T* block_begin =
-			static_cast<T*>(this->m_space) + total_used + memsize_padded;
+		if (memsize_padded > this->m_total_available) {
+			if (this->m_current_index > 0 &&
+				(fr_index = this->m_freed_table.available(memsize_padded)) !=
+					-1) {
+				block_begin = static_cast<T*>(
+					m_freed_table.remove_region(fr_index, memsize_padded));
+			} else {
+				throw std::runtime_error(
+					"Out of memory: couldn't allocate new memory");
+			}
+		} else {
+			block_begin =
+				static_cast<T*>(this->m_space) + total_used + memsize_padded;
+		}
 
 		auto block =
 			MemBlock<T>(block_begin, memsize, this->m_current_index++, padding);
@@ -198,16 +154,19 @@ public:
 		return block;
 	}
 
-	template <typename T> auto reallocate(MemBlock<T>& memblock) -> void;
-	template <typename T> auto freemem(MemBlock<T> block) -> void;
+	template <typename T> auto free(const MemBlock<T>& block) -> void {
+		// mark the region as freed
+		const size_t total_size = block.m_size + block.m_padding;
 
-	/**
-	 * @brief Resets the allocator, voiding all previous allocations.
-	 * @note Using any `MemBlock`s allocated before a reset is undefined
-	 * behaviour after reset is called.
-	 */
-	auto reset() -> void;
-	auto setmem() -> void;
+		m_freed_table.add_region(block.m_ptr, total_size);
+		this->m_total_available += total_size;
+		this->m_total_padding -= block.m_padding;
+	};
+
+	template <typename T> auto reallocate(MemBlock<T>& memblock) -> void {
+		throw std::runtime_error(
+			"Call to unimplemented function: reallocate()");
+	};
 };
 } // namespace LibMem
 

@@ -10,22 +10,15 @@ int main() {
 	for (size_t i = 0; i < 10; i++) {
 		intblock[i] = i + 1;
 	}
+	allocator.free(intblock);
 
-	auto floatblock = allocator.allocate<10, float>();
+	auto intblockreturns = allocator.allocate<10, int>();
 	for (size_t i = 0; i < 10; i++) {
-		floatblock[i] = i + 0.123;
+		intblockreturns[i] = i + 100;
 	}
 
 	for (size_t i = 0; i < 10; i++) {
-		std::cout << "Int Array: " << intblock[i] << std::endl
-				  << "Float Array: " << floatblock[i] << std::endl
-				  << std::endl;
+		std::cout << intblockreturns[i] << std::endl;
 	}
-
-	auto& x = *(intblock + 2);
-	x = 123;
-
-	std::cout << sizeof(MemBlock<double>) << std::endl;
-
 	return 0;
 }
