@@ -5,19 +5,27 @@ using namespace LibMem;
 
 int main() {
 	auto allocator = Allocator();
-	constexpr size_t size = 10;
-	constexpr size_t sizeofint = sizeof(int);
-	auto intblock = allocator.allocate<size, sizeofint>();
 
-	int* heapintarr = static_cast<int*>(intblock.getptr());
-
-	for (int i = 0; i < 10; i++) {
-		heapintarr[i] = i + 1;
+	auto intblock = allocator.allocate<10, int>();
+	for (size_t i = 0; i < 10; i++) {
+		intblock[i] = i + 1;
 	}
 
-	for (int i = 0; i < 10; i++) {
-		std::cout << heapintarr[i] << std::endl;
+	auto floatblock = allocator.allocate<10, float>();
+	for (size_t i = 0; i < 10; i++) {
+		floatblock[i] = i + 0.123;
 	}
+
+	for (size_t i = 0; i < 10; i++) {
+		std::cout << "Int Array: " << intblock[i] << std::endl
+				  << "Float Array: " << floatblock[i] << std::endl
+				  << std::endl;
+	}
+
+	auto& x = *(intblock + 2);
+	x = 123;
+
+	std::cout << *(intblock + 2) << std::endl;
 
 	return 0;
 }

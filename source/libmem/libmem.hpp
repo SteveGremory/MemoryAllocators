@@ -3,7 +3,9 @@
 
 #include "utils/utils.hpp"
 
+#include <concepts>
 #include <cstdlib>
+#include <iostream>
 #include <stdexcept>
 
 namespace LibMem {
@@ -15,29 +17,98 @@ constexpr size_t SPACESIZE = 4096 * 4;
 // 64 bytes, then at least 2
 // blocks should be pretty
 // fast to access
-struct MemBlock {
-	MemBlock(void* ptr, size_t size, size_t index, size_t padding);
-	~MemBlock();
+template <typename T> struct MemBlock {
+
+	MemBlock(T* ptr, size_t size, size_t index, size_t padding)
+		: m_ptr(ptr), m_size(size), m_index(index), m_padding(padding) {}
+
+	~MemBlock() {}
 
 	/**
 	 * @brief Returns a pointer to the *start* of the data in memory. The
 	 * pointer may change after a call to allocate/free.
 	 * @returns Pointer to the start of the data in memory.
 	 */
-	auto getptr() -> void*;
+	auto getptr() -> T* { return this->m_ptr; }
 
 	/**
 	 * @brief Getter function to get the size of the MemBlock
 	 * @returns Size of the MemBlock in bytes
 	 */
-	auto getsize() -> size_t;
+	auto getsize() -> size_t { return this->m_size; }
 
 	// Iterator functions
-	auto begin() -> void*;
-	auto end() -> void*;
+	auto begin() -> T* { return this->m_ptr; }
+	auto end() -> T* { return this->m_ptr + this->m_size; }
+
+	/**
+	 * @brief If the underlying type supports array indexing, it will be
+	 * available via the MemBlock itself.
+	 *
+	 * @note Always prefer using integrated MemBlock functions and avoid using
+	 * pointers direclty whenever possible.
+	 */
+	T& operator[](size_t index) {
+		static_assert(
+			requires { this->m_ptr[0]; },
+			"This type does NOT support the index operator");
+
+		if (index >= this->m_size) {
+			throw std::out_of_range("Access violation: index out of range.");
+		}
+
+		return this->m_ptr[index];
+	}
+
+	// Overload the ++ operator (prefix)
+	MemBlock<T>& operator++() {
+		if (this->m_ptr < this->m_ptr + this->m_size - 1) {
+			++this->m_ptr;
+		} else {
+			throw std::out_of_range("Pointer out of bounds");
+		}
+		return *this;
+	}
+
+	// Overload the ++ operator (postfix)
+	MemBlock<T> operator++(auto) {
+		MemBlock<T> temp(*this);
+		if (this->m_ptr < this->m_ptr + this->m_size - 1) {
+			++this->m_ptr;
+		} else {
+			throw std::out_of_range("Pointer out of bounds");
+		}
+		return temp;
+	}
+
+	// Overload the + operator
+	MemBlock<T> operator+(size_t offset) const {
+		if (this->m_ptr + offset < this->m_ptr + this->m_size) {
+			return MemBlock<T>(this->m_ptr + offset, this->m_size - offset,
+							   this->m_index, this->m_padding);
+		} else {
+			throw std::out_of_range("Pointer out of bounds");
+		}
+	}
+
+	// Overload the dereference operator
+	T& operator*() {
+		if (this->m_ptr >= this->m_ptr + this->m_size) {
+			throw std::out_of_range("Pointer out of bounds");
+		}
+		return *this->m_ptr;
+	}
+
+	// Overload the arrow operator
+	T* operator->() {
+		if (this->m_ptr >= this->m_ptr + this->m_size) {
+			throw std::out_of_range("Pointer out of bounds");
+		}
+		return this->m_ptr;
+	}
 
 private:
-	void* m_ptr;
+	T* m_ptr;
 
 	size_t m_size;
 	size_t m_index;
@@ -62,7 +133,7 @@ private:
 	size_t m_total_padding;
 	size_t m_current_index;
 
-	auto defragment() -> void;
+	auto m_defragment() -> void;
 
 public:
 	Allocator();
@@ -77,18 +148,17 @@ public:
 	 * @returns MemBlock structure populated with details about the memory
 	 */
 
-	template <size_t AMT, size_t TSIZE>
-	[[nodiscard]] auto allocate() -> MemBlock {
-		constexpr size_t memsize = AMT * TSIZE;
+	template <size_t AMT, typename T>
+	[[nodiscard]] auto allocate() -> MemBlock<T> {
+		constexpr size_t memsize = AMT;
 		constexpr size_t memsize_padded = Utils::round_pow_two(memsize);
-		constexpr size_t padding = memsize - memsize_padded;
+		constexpr size_t padding = memsize_padded - memsize;
 
 		// if the amount being asked for is
 		// larger than what is possible, die
-		if constexpr (memsize > SPACESIZE) {
-			throw std::runtime_error("Invalid Allocation: The requested "
-									 "size exceeds the maximum allowed size.");
-		}
+		static_assert(!(memsize > SPACESIZE),
+					  "Invalid Allocation: The requested size exceeds the "
+					  "maximum allowed size.");
 
 		// if the memory is available: allocate
 		// else: try and defragment
@@ -101,7 +171,7 @@ public:
 			// Try to defrag the memory and if
 			// that fails, throw what it threw again.
 			try {
-				this->defragment();
+				this->m_defragment();
 			} catch (const std::exception& e) {
 				throw std::runtime_error(
 					"Failed to allocate memory after defragmentation: " +
@@ -112,11 +182,11 @@ public:
 		// If all checks pass, construct
 		// a MemBlock with the requirements
 		size_t total_used = SPACESIZE - this->m_total_available;
-		size_t* block_begin =
-			static_cast<size_t*>(this->m_space) + total_used + memsize_padded;
+		T* block_begin =
+			static_cast<T*>(this->m_space) + total_used + memsize_padded;
 
-		auto block = MemBlock(static_cast<void*>(block_begin), memsize_padded,
-							  this->m_current_index++, padding);
+		auto block =
+			MemBlock<T>(block_begin, memsize, this->m_current_index++, padding);
 
 		// in the end, increment the class
 		// padding and the total
@@ -127,9 +197,10 @@ public:
 		return block;
 	}
 
-	[[nodiscard]] auto reallocte(MemBlock& memblock) -> MemBlock;
+	template <typename T>
+	[[nodiscard]] auto reallocte(MemBlock<T>& memblock) -> MemBlock<T>;
 
-	auto freemem(MemBlock block) -> void;
+	template <typename T> auto freemem(MemBlock<T> block) -> void;
 	auto setmem() -> void;
 };
 } // namespace LibMem
