@@ -12,7 +12,7 @@
 
 namespace LibMem {
 
-constexpr size_t SPACESIZE = 32;
+constexpr size_t SPACESIZE = 16 * sizeof(int) * 2;
 
 class FreedTable {
 public:
@@ -96,7 +96,7 @@ public:
 	 */
 	template <size_t AMT, typename T>
 	[[nodiscard]] auto allocate() -> MemBlock<T> {
-		constexpr size_t memsize = AMT;
+		constexpr size_t memsize = AMT * sizeof(T);
 		constexpr size_t memsize_padded = Utils::round_pow_two(memsize);
 		constexpr size_t padding = memsize_padded - memsize;
 
@@ -143,18 +143,18 @@ public:
 					"Out of memory: couldn't allocate new memory");
 			}
 		} else {
-			block_begin = static_cast<T*>(this->m_space) + total_used;
+			block_begin =
+				static_cast<T*>(this->m_space) + (total_used / sizeof(T));
 		}
 
-		auto block =
-			MemBlock<T>(block_begin, memsize, this->m_current_index++, padding);
+		auto block = MemBlock<T>(block_begin, AMT, memsize,
+								 this->m_current_index++, padding);
 
 		// in the end, increment the class
 		// padding and the total
 		// memory used
 		this->m_total_padding += padding;
 		this->m_total_available -= memsize_padded;
-
 		return block;
 	}
 
@@ -171,8 +171,6 @@ public:
 		throw std::runtime_error(
 			"Call to unimplemented function: reallocate()");
 	};
-
-	inline auto getspace() -> void* { return this->m_space; }
 };
 } // namespace LibMem
 

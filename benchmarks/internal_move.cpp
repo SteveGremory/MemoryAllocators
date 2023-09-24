@@ -1,13 +1,13 @@
 #include <benchmark/benchmark.h>
 #include <chrono>
 #include <cstdlib>
+#include <cstring>
 #include <libmem/libmem.hpp>
 #include <stdexcept>
 
 // A benchmark for checking the defragmentation algorithm
 static void MemcpyBenchmark(benchmark::State& state) {
 	auto allocator = LibMem::Allocator();
-	int* space = static_cast<int*>(allocator.getspace());
 
 	for (auto _ : state) {
 
@@ -24,26 +24,8 @@ static void MemcpyBenchmark(benchmark::State& state) {
 
 		// move the 2nd part `padding` bytes behind in the memory, this
 		// means that (6 + 6) = 12 bytes of space will be freed.
-		auto b1_ptr = intblock.getptr();
-		auto b2_ptr = intblock2.getptr();
-
-		benchmark::DoNotOptimize(b1_ptr);
-		benchmark::DoNotOptimize(b2_ptr);
-
-		std::cout << "SPACE BEFORE MEMCPY: \t";
-		for (int i = 0; i < 32; i++) {
-			std::cout << space[i] << '\t';
-		}
-		std::cout << std::endl;
-
-		memcpy(b1_ptr + intblock.getsize(), b2_ptr,
-			   intblock2.getsize() * sizeof(int));
-
-		std::cout << "SPACE AFTER MEMCPY: \t";
-		for (int i = 0; i < 32; i++) {
-			std::cout << space[i] << '\t';
-		}
-		std::cout << std::endl << std::endl;
+		memmove(intblock.getptr() + intblock.getamt(), intblock2.getptr(),
+				intblock2.getsize());
 
 		// Reset the allocator for the next run
 		allocator.reset();
@@ -51,4 +33,4 @@ static void MemcpyBenchmark(benchmark::State& state) {
 	}
 }
 
-BENCHMARK(MemcpyBenchmark); //->Range(0, 1000);
+BENCHMARK(MemcpyBenchmark)->Range(0, 1000);

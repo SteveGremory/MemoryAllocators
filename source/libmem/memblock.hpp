@@ -11,8 +11,9 @@ namespace LibMem {
 
 template <typename T> class MemBlock {
 public:
-	MemBlock(T* ptr, size_t size, size_t index, size_t padding)
-		: m_ptr(ptr), m_size(size), m_index(index), m_padding(padding) {}
+	MemBlock(T* ptr, size_t items, size_t size, size_t index, size_t padding)
+		: m_ptr(ptr), m_items(items), m_size(size), m_index(index),
+		  m_padding(padding) {}
 
 	~MemBlock() {}
 
@@ -29,9 +30,16 @@ public:
 	 */
 	auto getsize() -> size_t { return this->m_size; }
 
+	/**
+	 * @brief Getter function to get the number of items of type T stored in the
+	 * MemBlock
+	 * @returns Number of items of type T stored in the MemBlock
+	 */
+	auto getamt() -> size_t { return this->m_items; }
+
 	// Iterator functions
 	auto begin() -> T* { return this->m_ptr; }
-	auto end() -> T* { return this->m_ptr + this->m_size; }
+	auto end() -> T* { return this->m_ptr + this->m_items; }
 
 	/**
 	 * @brief If the underlying type supports array indexing, it will be
@@ -45,7 +53,7 @@ public:
 			requires { this->m_ptr[0]; },
 			"This type does NOT support the index operator");
 
-		if (index >= this->m_size) {
+		if (index >= this->m_items) {
 			throw std::out_of_range("Access violation: index out of range.");
 		}
 
@@ -54,7 +62,7 @@ public:
 
 	// Overload the ++ operator (prefix)
 	MemBlock<T>& operator++() {
-		if (this->m_ptr < this->m_ptr + this->m_size - 1) {
+		if (this->m_ptr < this->m_ptr + this->m_items - 1) {
 			++this->m_ptr;
 		} else {
 			throw std::out_of_range("Pointer out of bounds");
@@ -65,7 +73,7 @@ public:
 	// Overload the ++ operator (postfix)
 	MemBlock<T> operator++(auto) {
 		MemBlock<T> temp(*this);
-		if (this->m_ptr < this->m_ptr + this->m_size - 1) {
+		if (this->m_ptr < this->m_ptr + this->m_items - 1) {
 			++this->m_ptr;
 		} else {
 			throw std::out_of_range("Pointer out of bounds");
@@ -75,8 +83,8 @@ public:
 
 	// Overload the + operator
 	MemBlock<T> operator+(size_t offset) const {
-		if (this->m_ptr + offset < this->m_ptr + this->m_size) {
-			return MemBlock<T>(this->m_ptr + offset, this->m_size - offset,
+		if (this->m_ptr + offset < this->m_ptr + this->m_items) {
+			return MemBlock<T>(this->m_ptr + offset, this->m_items - offset,
 							   this->m_index, this->m_padding);
 		} else {
 			throw std::out_of_range("Pointer out of bounds");
@@ -85,7 +93,7 @@ public:
 
 	// Overload the dereference operator
 	T& operator*() {
-		if (this->m_ptr >= this->m_ptr + this->m_size) {
+		if (this->m_ptr >= this->m_ptr + this->m_items) {
 			throw std::out_of_range("Pointer out of bounds");
 		}
 		return *this->m_ptr;
@@ -93,7 +101,7 @@ public:
 
 	// Overload the arrow operator
 	T* operator->() {
-		if (this->m_ptr >= this->m_ptr + this->m_size) {
+		if (this->m_ptr >= this->m_ptr + this->m_items) {
 			throw std::out_of_range("Pointer out of bounds");
 		}
 		return this->m_ptr;
@@ -102,6 +110,7 @@ public:
 private:
 	T* m_ptr;
 
+	size_t m_items;
 	size_t m_size;
 	size_t m_index;
 	size_t m_padding;
