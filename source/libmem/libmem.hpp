@@ -12,7 +12,7 @@
 
 namespace LibMem {
 
-constexpr size_t SPACESIZE = 8192;
+constexpr size_t SPACESIZE = 32;
 
 class FreedTable {
 public:
@@ -53,6 +53,11 @@ public:
 
 private:
 	std::vector<std::pair<void*, size_t>> m_freed_regions;
+
+	// Allocator is a friend class
+	// so that it can access
+	// FreedTable's private members
+	friend class Allocator;
 };
 
 // This class should ideally
@@ -138,8 +143,7 @@ public:
 					"Out of memory: couldn't allocate new memory");
 			}
 		} else {
-			block_begin =
-				static_cast<T*>(this->m_space) + total_used + memsize_padded;
+			block_begin = static_cast<T*>(this->m_space) + total_used;
 		}
 
 		auto block =
@@ -167,6 +171,8 @@ public:
 		throw std::runtime_error(
 			"Call to unimplemented function: reallocate()");
 	};
+
+	inline auto getspace() -> void* { return this->m_space; }
 };
 } // namespace LibMem
 

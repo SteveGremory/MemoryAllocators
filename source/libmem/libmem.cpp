@@ -3,9 +3,8 @@
 namespace LibMem {
 
 Allocator::Allocator() {
-	m_space = nullptr;
 	this->m_space = std::malloc(SPACESIZE);
-	if (this->m_space == nullptr || this->m_space == NULL) {
+	if (this->m_space == NULL) {
 		throw std::runtime_error("malloc has failed");
 	}
 	this->m_total_available = SPACESIZE;
@@ -23,6 +22,8 @@ auto Allocator::reset() -> void {
 	m_total_available = SPACESIZE;
 	m_total_padding = 0;
 	m_current_index = 0;
+
+	this->m_freed_table.m_freed_regions.clear();
 }
 
 FreedTable::FreedTable() { this->m_freed_regions.reserve(32); }
