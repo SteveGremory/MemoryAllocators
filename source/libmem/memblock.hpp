@@ -37,6 +37,13 @@ public:
 	 */
 	auto getamt() -> size_t { return this->m_items; }
 
+	/**
+	 * @brief Getter function to get the index of the MemBlock inside the
+	 * allocator
+	 * @returns The index of this MemBlock inside the allocator
+	 */
+	auto getindex() -> size_t { return this->m_index; }
+
 	// Iterator functions
 	auto begin() -> T* { return this->m_ptr; }
 	auto end() -> T* { return this->m_ptr + this->m_items; }
@@ -114,11 +121,6 @@ private:
 	size_t m_size;
 	size_t m_index;
 	size_t m_padding;
-
-	// Allocator is a friend class
-	// so that it can access
-	// MemBlock's private members
-	friend class Allocator;
 };
 } // namespace LibMem
 

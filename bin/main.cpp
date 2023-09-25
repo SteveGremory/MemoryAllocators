@@ -4,7 +4,7 @@
 using namespace LibMem;
 
 int main() {
-	auto allocator = Allocator();
+	auto allocator = Allocator<16 * sizeof(int)>();
 
 	auto intblock = allocator.allocate<10, int>();
 	for (size_t i = 0; i < 10; i++) {
