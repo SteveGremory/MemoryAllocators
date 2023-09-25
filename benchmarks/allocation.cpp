@@ -4,9 +4,15 @@
 #include <libmem/libmem.hpp>
 #include <stdexcept>
 
+#include <cstdio>
+#include <random>
+
+std::random_device seed;
+std::mt19937 gen(seed());
+
 static void MallocBenchmark(benchmark::State& state) {
 
-	for (auto _ : state) {
+	for (auto x : state) {
 		int* intblock;
 
 		benchmark::DoNotOptimize(intblock);
@@ -39,5 +45,5 @@ static void LibMemBenchmark(benchmark::State& state) {
 	}
 }
 
-BENCHMARK(LibMemBenchmark)->Range(0, 1000);
-// BENCHMARK(MallocBenchmark)->Range(0, 1000);
+// BENCHMARK(LibMemBenchmark);
+// BENCHMARK(MallocBenchmark);

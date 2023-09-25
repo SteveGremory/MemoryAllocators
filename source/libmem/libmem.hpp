@@ -47,13 +47,35 @@ private:
 
 	std::vector<BlockInfo> m_blocks;
 
-	auto m_defragment() -> void {
+	template <typename T> auto m_defragment(size_t memsize) -> void {
+		if (memsize > (this->m_total_padding + this->m_total_available)) {
+			throw std::runtime_error("Out of memory");
+		}
+
 		// For each block of memory
 		// remove the padding until there's
 		// enough space to fit whatever
 		// is being allocated
-		throw std::runtime_error(
-			"Call to unimplemented function: m_defragment()");
+		for (auto idx = 0; idx < this->m_blocks.size(); idx++) {
+			if (idx > this->m_blocks.size()) {
+				break;
+			}
+
+			BlockInfo& current_block = this->m_blocks[idx];
+			BlockInfo& next_block = this->m_blocks[idx + 1];
+
+			const size_t ptrfwd =
+				(current_block.size - current_block.padding) / sizeof(T);
+
+			memmove(static_cast<T*>(current_block.addr) + ptrfwd,
+					next_block.addr, next_block.size);
+
+			this->m_total_available += current_block.padding;
+			this->m_total_padding -= current_block.padding;
+
+			current_block.size -= current_block.padding;
+			current_block.padding = 0;
+		}
 	}
 
 public:
@@ -68,6 +90,8 @@ public:
 	}
 
 	~Allocator() { std::free(this->m_space); }
+
+	auto getspace() -> void* { return this->m_space; }
 
 	/**
 	 * @brief Resets the allocator, voiding all previous allocations.
@@ -104,19 +128,13 @@ public:
 		// else: try and defragment
 		//       if defrag fails: throw OOM and die
 
-		if (memsize_padded > this->m_total_available &&
-			memsize_padded > this->m_total_padding) {
-
-			throw std::runtime_error("Out of memory");
-		} else if (memsize_padded > this->m_total_available &&
-				   memsize_padded < this->m_total_padding) {
+		if (memsize_padded > this->m_total_available) {
 			// Try to defrag the memory and if
 			// that fails, throw what it threw again.
 			try {
-				this->m_defragment();
-			} catch (const std::exception& e) {
-				throw std::runtime_error("Failed to defragment the memory: " +
-										 std::string(e.what()));
+				this->m_defragment<T>(memsize_padded);
+			} catch (...) {
+				throw;
 			}
 		}
 

@@ -36,11 +36,12 @@ add_library(libmem ${libmem_SOURCES})
 target_include_directories(libmem PUBLIC 
         source/
 )
-target_link_libraries(libmem PUBLIC asan)
+# TODO: Fix asan on macOS
+#target_link_libraries(libmem PUBLIC asan)
 target_compile_options(libmem PRIVATE
         -Wall -Wextra -fno-omit-frame-pointer
         # TODO: Fix asan on macOS
-        -fsanitize=address
+        # -fsanitize=address
 )
 
 # An exec to quick-test with
