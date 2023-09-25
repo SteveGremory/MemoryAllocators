@@ -7,6 +7,7 @@
 #include <cassert>
 #include <concepts>
 #include <cstdlib>
+#include <cstring>
 #include <iostream>
 #include <stdexcept>
 #include <vector>
@@ -57,18 +58,19 @@ private:
 		// enough space to fit whatever
 		// is being allocated
 		for (auto idx = 0; idx < this->m_blocks.size(); idx++) {
-			if (idx > this->m_blocks.size()) {
-				break;
-			}
-
 			BlockInfo& current_block = this->m_blocks[idx];
 			BlockInfo& next_block = this->m_blocks[idx + 1];
 
+			std::cout << "NBS: " << next_block.size << std::endl;
+
 			const size_t ptrfwd =
 				(current_block.size - current_block.padding) / sizeof(T);
-
 			memmove(static_cast<T*>(current_block.addr) + ptrfwd,
 					next_block.addr, next_block.size);
+
+			next_block.addr =
+				static_cast<void*>(static_cast<T*>(next_block.addr) -
+								   (current_block.padding / sizeof(T)));
 
 			this->m_total_available += current_block.padding;
 			this->m_total_padding -= current_block.padding;
@@ -250,6 +252,8 @@ public:
 
 		return retval;
 	}
+
+	auto m_getptr(size_t idx) -> void* { return this->m_blocks[idx].addr; }
 
 	template <typename T> auto reallocate(MemBlock<T>& memblock) -> void {
 		throw std::runtime_error(
