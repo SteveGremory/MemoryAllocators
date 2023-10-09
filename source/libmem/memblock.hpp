@@ -7,13 +7,77 @@
 #include <stdexcept>
 #include <vector>
 
+#include "libmem.hpp"
+
 namespace LibMem {
+struct BlockInfo {
+	void* addr{nullptr};
+
+	size_t padding{0};
+	size_t size{0};
+
+	bool free{false};
+
+	BlockInfo(void* addr, size_t padding, size_t size, bool free)
+		: addr(addr), padding(padding), size(size), free(free) {}
+
+	// Move Constructor
+	BlockInfo(BlockInfo&& source) noexcept
+		: addr(std::move(source.addr)), padding(std::move(source.padding)),
+		  size(std::move(source.size)), free(std::move(source.free)) {
+		source.addr = nullptr;
+	}
+
+	BlockInfo& operator=(BlockInfo&& source) {
+		// self-asignment check
+		if (this != &source) {
+			padding = std::move(source.padding);
+			size = std::move(source.size);
+			free = std::move(source.free);
+			addr = std::move(source.addr);
+
+			source.addr = nullptr;
+		}
+
+		return *this;
+	}
+
+	BlockInfo(const BlockInfo& source) = delete;
+	BlockInfo& operator=(const BlockInfo& source) = delete;
+};
 
 template <typename T> class MemBlock {
 public:
-	MemBlock(T* ptr, size_t items, size_t size, size_t index, size_t padding)
-		: m_ptr(ptr), m_items(items), m_size(size), m_index(index),
-		  m_padding(padding) {}
+	MemBlock(T* ptr, size_t items, size_t size, size_t padding)
+		: m_ptr(ptr), m_items(items), m_size(size), m_padding(padding) {}
+
+	MemBlock(BlockInfo* blockinfo, size_t items)
+		: m_ptr(static_cast<T*>(blockinfo->addr)), m_items(items),
+		  m_size(blockinfo->size), m_padding(blockinfo->padding) {}
+
+	// Move Constructor
+	MemBlock(MemBlock&& source) noexcept
+		: m_ptr(std::move(source.m_ptr)),
+		  m_padding(std::move(source.m_padding)),
+		  m_size(std::move(source.m_size)) {
+		source.m_ptr = nullptr;
+	}
+
+	MemBlock& operator=(MemBlock&& source) {
+		// self-asignment check
+		if (this != &source) {
+			m_padding = std::move(source.m_padding);
+			m_size = std::move(source.m_size);
+			m_ptr = std::move(source.m_ptr);
+
+			source.m_ptr = nullptr;
+		}
+
+		return *this;
+	}
+
+	MemBlock(const MemBlock& source) = delete;
+	MemBlock& operator=(const MemBlock& source) = delete;
 
 	~MemBlock() {}
 
@@ -36,13 +100,6 @@ public:
 	 * @returns Number of items of type T stored in the MemBlock
 	 */
 	auto getamt() -> size_t { return this->m_items; }
-
-	/**
-	 * @brief Getter function to get the index of the MemBlock inside the
-	 * allocator
-	 * @returns The index of this MemBlock inside the allocator
-	 */
-	auto getindex() -> size_t { return this->m_index; }
 
 	// Iterator functions
 	auto begin() -> T* { return this->m_ptr; }
@@ -92,7 +149,7 @@ public:
 	MemBlock<T> operator+(size_t offset) const {
 		if (this->m_ptr + offset < this->m_ptr + this->m_items) {
 			return MemBlock<T>(this->m_ptr + offset, this->m_items - offset,
-							   this->m_index, this->m_padding);
+							   this->m_padding);
 		} else {
 			throw std::out_of_range("Pointer out of bounds");
 		}
@@ -119,7 +176,6 @@ private:
 
 	size_t m_items;
 	size_t m_size;
-	size_t m_index;
 	size_t m_padding;
 };
 } // namespace LibMem

@@ -45,5 +45,5 @@ static void LibMemBenchmark(benchmark::State& state) {
 	}
 }
 
-// BENCHMARK(LibMemBenchmark);
-// BENCHMARK(MallocBenchmark);
+BENCHMARK(LibMemBenchmark);
+BENCHMARK(MallocBenchmark);
